@@ -1,11 +1,24 @@
 #include "threads.h"
 
+// TODO: Add mutex for dtors.
+tss_dtor_t _Dtors[64 + 1024];
+
+typedef struct _Tss_dtor_node
+{
+    tss_dtor_t _Dtor;
+    void* _Data;
+    struct _Tss_dtor_node* _Next;
+} _Tss_dtor_node;
+
+_Thread_local _Tss_dtor_node* _Dtor_head = NULL;
+_Thread_local _Tss_dtor_node* _Dtor_tail = NULL;
+
 int thrd_create(thrd_t* thr, thrd_start_t func, void* arg)
 {
     thr->_Hnd = CreateThread(NULL, 0, func, arg, 0, &(thr->_Id));
     if (!thr->_Hnd)
     {
-        if (GetLastError() == thrd_nomem)
+        if (GetLastError() == ERROR_OUTOFMEMORY)
             return thrd_nomem;
         else
             return thrd_error;
@@ -27,7 +40,8 @@ int thrd_sleep(const struct timespec* duration, struct timespec* remaining)
 {
     struct timespec t1;
     timespec_get(&t1, TIME_UTC);
-    _Thrd_sleep((const xtime*)duration);
+    DWORD r = !SleepEx((DWORD)duration->tv_sec * 1000 + duration->tv_nsec / 1000000, TRUE);
+    if (!r) return 0;
     if (remaining)
     {
         struct timespec t2;
@@ -40,11 +54,19 @@ int thrd_sleep(const struct timespec* duration, struct timespec* remaining)
             remaining->tv_nsec += 1000000000;
         }
     }
-    return 0;
+    return r == WAIT_IO_COMPLETION ? -1 : -2;
 }
 
 __declspec(noreturn) void thrd_exit(int res)
 {
+    _Tss_dtor_node* current = _Dtor_head;
+    while (current)
+    {
+        _Tss_dtor_node* next = current->_Next;
+        current->_Dtor(current->_Data);
+        free(current);
+        current = next;
+    }
     ExitThread((DWORD)res);
 }
 
@@ -62,12 +84,14 @@ void call_once(once_flag* flag, void (*func)(void))
 
 int tss_create(tss_t* tss_key, tss_dtor_t destructor)
 {
-	// TODO: Use destructor.
     *tss_key = TlsAlloc();
     if (*tss_key == TLS_OUT_OF_INDEXES)
         return thrd_error;
     else
+    {
+        _Dtors[*tss_key] = destructor;
         return thrd_success;
+    }
 }
 
 void* tss_get(tss_t tss_key)
@@ -85,5 +109,14 @@ int tss_set(tss_t tss_id, void* val)
 
 void tss_delete(tss_t tss_id)
 {
+    _Tss_dtor_node* node = malloc(sizeof(_Tss_dtor_node));
+    node->_Dtor = _Dtors[tss_id];
+    node->_Data = TlsGetValue(tss_id);
+    node->_Next = NULL;
+    if (!_Dtor_head)
+        _Dtor_head = node;
+    else
+        _Dtor_tail->_Next = node;
+    _Dtor_tail = node;
     TlsFree(tss_id);
 }

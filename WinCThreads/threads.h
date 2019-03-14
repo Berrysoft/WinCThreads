@@ -1,4 +1,6 @@
 #pragma once
+#ifndef _INC_THREADS
+#define _INC_THREADS
 
 #ifndef __STDC_NO_THREADS__
 
@@ -10,8 +12,6 @@
 extern "C"
 {
 #endif // __cplusplus
-
-#define _Thread_local __declspec(thread)
 
     enum
     {
@@ -66,7 +66,11 @@ extern "C"
     inline int cnd_timedwait(cnd_t* __restrict cond, mtx_t* __restrict mutex, const struct timespec* __restrict time_point) { return _Cnd_timedwait(*cond, *mutex, (const xtime*)time_point); }
     inline void cnd_destroy(cnd_t* cond) { _Cnd_destroy(*cond); }
 
+#define _Thread_local __declspec(thread)
+#ifndef __cpluscplus
 #define thread_local _Thread_local
+#endif // !__cpluscplus
+
 #define TSS_DTOR_ITERATIONS 256
 
     typedef void (*tss_dtor_t)(void*);
@@ -83,3 +87,4 @@ extern "C"
 #endif // __cplusplus
 
 #endif // !__STDC_NO_THREADS__
+#endif // !_INC_THREADS

@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.28711.60
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinCThreads", "WinCThreads\WinCThreads.vcxproj", "{61BE80C8-5CCD-461B-BBB3-B129D408E1A1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinCThreadsSample", "WinCThreadsSample\WinCThreadsSample.vcxproj", "{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{61BE80C8-5CCD-461B-BBB3-B129D408E1A1}.Release|x64.Build.0 = Release|x64
 		{61BE80C8-5CCD-461B-BBB3-B129D408E1A1}.Release|x86.ActiveCfg = Release|Win32
 		{61BE80C8-5CCD-461B-BBB3-B129D408E1A1}.Release|x86.Build.0 = Release|Win32
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Debug|x64.ActiveCfg = Debug|x64
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Debug|x64.Build.0 = Debug|x64
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Debug|x86.ActiveCfg = Debug|Win32
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Debug|x86.Build.0 = Debug|Win32
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Release|x64.ActiveCfg = Release|x64
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Release|x64.Build.0 = Release|x64
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Release|x86.ActiveCfg = Release|Win32
+		{EE1F4B47-6BC0-4247-96F6-C4CD4CE968A1}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
