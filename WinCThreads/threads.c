@@ -20,7 +20,7 @@ typedef struct
     void* _Arg;
 } _Thrd_start_arg;
 
-DWORD _Thrd_start(void* arg)
+DWORD WINAPI _Thrd_start(void* arg)
 {
     _Thrd_start_arg* start_arg = arg;
     int res = start_arg->_Func(start_arg->_Arg);
@@ -36,7 +36,9 @@ int thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg)
     {
         start_arg->_Func = func;
         start_arg->_Arg = arg;
-        thr->_Hnd = CreateThread(NULL, 0, _Thrd_start, start_arg, 0, &(thr->_Id));
+        DWORD id;
+        thr->_Hnd = CreateThread(NULL, 0, _Thrd_start, start_arg, 0, &id);
+        thr->_Id = id;
     }
     if (!thr->_Hnd)
     {
@@ -52,7 +54,10 @@ int thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg)
 
 thrd_t thrd_current(void)
 {
-    return (thrd_t){ ._Hnd = GetCurrentThread(), ._Id = GetCurrentThreadId() };
+    thrd_t t;
+    t._Hnd = GetCurrentThread();
+    t._Id = GetCurrentThreadId();
+    return t;
 }
 
 int thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining)
@@ -93,14 +98,16 @@ __declspec(noreturn) void thrd_exit(_In_ int res)
 
 BOOL _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* context)
 {
-    void (*func)(void) = parameter;
+    (void)initOnce;
+    (void)context;
+    void (*func)(void) = (void (*)(void))parameter;
     func();
     return TRUE;
 }
 
 void call_once(_In_ once_flag* flag, _In_ void (*func)(void))
 {
-    InitOnceExecuteOnce((PINIT_ONCE)flag, _Init_once_callback, func, NULL);
+    InitOnceExecuteOnce((PINIT_ONCE)flag, _Init_once_callback, (void*)func, NULL);
 }
 
 int tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor)
