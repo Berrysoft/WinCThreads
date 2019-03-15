@@ -170,7 +170,7 @@ __declspec(noreturn) void thrd_exit(_In_ int res)
     ExitThread((DWORD)res);
 }
 
-static BOOL _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* context)
+static BOOL WINAPI _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* context)
 {
     // Ignore some params
     (void)initOnce;
@@ -181,7 +181,7 @@ static BOOL _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* con
     return TRUE;
 }
 
-void call_once(_In_ once_flag* flag, _In_ void (*func)(void))
+void call_once(_In_ once_flag* flag, _In_ void(__cdecl* func)(void))
 {
     BOOL r = InitOnceExecuteOnce((PINIT_ONCE)flag, _Init_once_callback, (void*)func, NULL);
     assert(r);

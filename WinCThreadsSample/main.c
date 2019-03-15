@@ -50,12 +50,12 @@ mtx_t cond_mutex;
 void free_print_1(void* p)
 {
     free(p);
-    printf("Freed_1: %p\n", p);
+    printf("Free_1: %p\n", p);
 }
 void free_print_2(void* p)
 {
     free(p);
-    printf("Freed_2: %p\n", p);
+    printf("Free_2: %p\n", p);
 }
 
 int thread_func(void* arg)
@@ -80,7 +80,7 @@ int thread_func(void* arg)
     printf("globalInt == %d\n", globalInt);
 
     tss_t key;
-    check_return(tss_create(&key, globalInt % 2 == 0 ? free_print_1 : free_print_2));
+    check_return(tss_create(&key, globalInt % 2 != 0 ? free_print_1 : free_print_2));
     // The standard says that the data should be initialized to NULL.
     assert(tss_get(key) == NULL);
     void* data = malloc(sizeof(int));
@@ -90,9 +90,11 @@ int thread_func(void* arg)
         *(int*)tss_get(key) = thrd_id;
         printf("TSS address: %p\tvalue: %d\n", tss_get(key), *(int*)tss_get(key));
     }
+    else
+    {
+        tss_delete(key);
+    }
 
-    call_once(&flag, print_string);
-    call_once(&flag, print_string);
     call_once(&flag, print_string);
 
     // A RIGHT sample for condition variables
