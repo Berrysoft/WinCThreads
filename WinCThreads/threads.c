@@ -1,8 +1,11 @@
 #include "threads.h"
 #include <Windows.h>
+#include <assert.h>
 #include <stdlib.h>
 
-static tss_dtor_t _Dtors[64 + 1024];
+#define _DTORS_COUNT (64 + 1024)
+
+static tss_dtor_t _Dtors[_DTORS_COUNT];
 
 typedef struct _Tss_dtor_node
 {
@@ -14,17 +17,33 @@ typedef struct _Tss_dtor_node
 static _Thread_local _Tss_dtor_node* _Dtor_head = NULL;
 static _Thread_local _Tss_dtor_node* _Dtor_tail = NULL;
 
+static void _Add_dtor(_In_ tss_dtor_t dtor, _In_opt_ void* data)
+{
+    _Tss_dtor_node* node = malloc(sizeof(_Tss_dtor_node));
+    if (node)
+    {
+        node->_Dtor = dtor;
+        node->_Data = data;
+        node->_Next = NULL;
+        if (!_Dtor_head)
+            _Dtor_head = node;
+        else
+            _Dtor_tail->_Next = node;
+        _Dtor_tail = node;
+    }
+}
+
 typedef struct
 {
     thrd_start_t _Func;
     void* _Arg;
 } _Thrd_start_arg;
 
-DWORD WINAPI _Thrd_start(void* arg)
+static DWORD WINAPI _Thrd_start(void* arg)
 {
+    _Add_dtor(free, arg);
     _Thrd_start_arg* start_arg = arg;
     int res = start_arg->_Func(start_arg->_Arg);
-    free(start_arg);
     thrd_exit(res);
 }
 
@@ -96,7 +115,7 @@ __declspec(noreturn) void thrd_exit(_In_ int res)
     ExitThread((DWORD)res);
 }
 
-BOOL _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* context)
+static BOOL _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* context)
 {
     (void)initOnce;
     (void)context;
@@ -117,6 +136,7 @@ int tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor)
         return thrd_error;
     else
     {
+        assert(*tss_key < _DTORS_COUNT);
         _Dtors[*tss_key] = destructor;
         return thrd_success;
     }
@@ -139,18 +159,7 @@ void tss_delete(_In_ tss_t tss_id)
 {
     if (_Dtors[tss_id])
     {
-        _Tss_dtor_node* node = malloc(sizeof(_Tss_dtor_node));
-        if (node)
-        {
-            node->_Dtor = _Dtors[tss_id];
-            node->_Data = TlsGetValue(tss_id);
-            node->_Next = NULL;
-            if (!_Dtor_head)
-                _Dtor_head = node;
-            else
-                _Dtor_tail->_Next = node;
-            _Dtor_tail = node;
-        }
+        _Add_dtor(_Dtors[tss_id], TlsGetValue(tss_id));
     }
     TlsFree(tss_id);
 }
