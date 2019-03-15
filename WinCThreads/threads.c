@@ -26,6 +26,7 @@
 #include "threads.h"
 #include <Windows.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 // TLS counts is limited to 1088 = 64 + 1024
@@ -33,45 +34,6 @@
 
 // An array of all the destructors
 static tss_dtor_t _Dtors[_DTORS_COUNT];
-
-// A list of destructors and data to delete.
-typedef struct _Tss_dtor_node
-{
-    tss_dtor_t _Dtor;
-    void* _Data;
-    struct _Tss_dtor_node* _Next;
-} _Tss_dtor_node;
-
-static thread_local _Tss_dtor_node* _Dtor_head = NULL;
-
-// Add a destructor to the list with its data
-static void _Add_dtor(_In_ tss_dtor_t dtor, _In_opt_ void* data)
-{
-    if (data)
-    {
-        _Tss_dtor_node* node = malloc(sizeof(_Tss_dtor_node));
-        if (node)
-        {
-            node->_Dtor = dtor;
-            node->_Data = data;
-            node->_Next = _Dtor_head;
-            _Dtor_head = node;
-        }
-    }
-}
-
-// Call all destructors
-static void _Tss_clear()
-{
-    _Tss_dtor_node* current = _Dtor_head;
-    while (current)
-    {
-        _Tss_dtor_node* next = current->_Next;
-        current->_Dtor(current->_Data);
-        free(current);
-        current = next;
-    }
-}
 
 // A list of all keys
 typedef struct _Tss_dtor_id_node
@@ -94,12 +56,14 @@ static void _Add_dtor_id(_In_ tss_t key)
     }
 }
 
-// Clear all remained data TSS_DTOR_ITERATIONS times.
-static void _Tss_clear_all()
+// Clear all remained data TSS_DTOR_ITERATIONS times,
+// And free them
+static void _Tss_clear_all(void)
 {
-    for (int i = 0, again = TRUE; i < TSS_DTOR_ITERATIONS && again; i++)
+    bool again = true;
+    for (int i = 0; i < TSS_DTOR_ITERATIONS && again; i++)
     {
-        again = FALSE;
+        again = false;
         for (_Tss_dtor_id_node* current = _All_dtor_head; current; current = current->_Next)
         {
             if (_Dtors[current->_Key])
@@ -108,8 +72,8 @@ static void _Tss_clear_all()
                 if (value)
                 {
                     TlsSetValue(current->_Key, NULL);
-                    again = TRUE;
-                    _Dtors[current->_Key](TlsGetValue(current->_Key));
+                    again = true;
+                    _Dtors[current->_Key](value);
                 }
             }
         }
@@ -118,6 +82,7 @@ static void _Tss_clear_all()
     while (current)
     {
         _Tss_dtor_id_node* next = current->_Next;
+        TlsFree(current->_Key);
         free(current);
         current = next;
     }
@@ -133,9 +98,12 @@ typedef struct
 // Promise that all data will be destructed by calling thrd_exit
 static DWORD WINAPI _Thrd_start(void* arg)
 {
-    _Add_dtor(free, arg);
     _Thrd_start_arg* start_arg = arg;
-    int res = start_arg->_Func(start_arg->_Arg);
+    thrd_start_t func = start_arg->_Func;
+    void* thrd_arg = start_arg->_Arg;
+    free(arg);
+
+    int res = func(thrd_arg);
     thrd_exit(res);
 }
 
@@ -198,7 +166,6 @@ int thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining)
 __declspec(noreturn) void thrd_exit(_In_ int res)
 {
     // Clear all data before exit
-    _Tss_clear();
     _Tss_clear_all();
     ExitThread((DWORD)res);
 }
@@ -249,11 +216,9 @@ int tss_set(_In_ tss_t tss_id, _In_opt_ void* val)
 
 void tss_delete(_In_ tss_t tss_id)
 {
-    if (_Dtors[tss_id])
-    {
-        _Add_dtor(_Dtors[tss_id], TlsGetValue(tss_id));
-        _Dtors[tss_id] = NULL;
-    }
-    BOOL r = TlsFree(tss_id);
+    _Dtors[tss_id] = NULL;
+    BOOL r = TlsSetValue(tss_id, NULL);
+    assert(r);
+    r = TlsFree(tss_id);
     assert(r);
 }

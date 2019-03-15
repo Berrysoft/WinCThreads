@@ -1,8 +1,34 @@
+/**WinCThreadsSample main.c
+ * 
+ * MIT License
+ * 
+ * Copyright (c) 2019 Berrysoft
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <threads.h>
 
+// Used for debug
 void check_return(int res)
 {
     assert(res == thrd_success);
@@ -11,15 +37,16 @@ void check_return(int res)
 #define THREADS_COUNT 4
 
 once_flag flag = ONCE_FLAG_INIT;
+// This function will be called only once
 void print_string(void) { printf("Hello once!\n"); }
 
 int globalInt;
 mtx_t mutex;
-thread_local unsigned int thrd_id;
 
 cnd_t cond;
 mtx_t cond_mutex;
 
+// Two different free functions
 void free_print_1(void* p)
 {
     free(p);
@@ -33,12 +60,15 @@ void free_print_2(void* p)
 
 int thread_func(void* arg)
 {
-    thrd_id = thrd_current()._Id;
-    printf(arg, thrd_id);
+    int thrd_id = *(int*)arg;
+    free(arg);
+    printf("Hello from thread %d!\n", thrd_id);
 
     int m = 5;
     while (m--)
     {
+        // If not locked, you may get 5 in the end.
+        // But actually we want 5 * THREADS_COUNT == 20 here.
         check_return(mtx_lock(&mutex));
 
         int t = globalInt;
@@ -51,22 +81,28 @@ int thread_func(void* arg)
 
     tss_t key;
     check_return(tss_create(&key, globalInt % 2 == 0 ? free_print_1 : free_print_2));
+    // The standard says that the data should be initialized to NULL.
     assert(tss_get(key) == NULL);
-    check_return(tss_set(key, malloc(sizeof(unsigned int))));
-    *(unsigned int*)tss_get(key) = thrd_id;
-    printf("TSS address: %p\tvalue: %u\n", tss_get(key), *(unsigned int*)tss_get(key));
-    tss_delete(key);
+    void* data = malloc(sizeof(int));
+    if (data)
+    {
+        check_return(tss_set(key, data));
+        *(int*)tss_get(key) = thrd_id;
+        printf("TSS address: %p\tvalue: %d\n", tss_get(key), *(int*)tss_get(key));
+    }
 
     call_once(&flag, print_string);
     call_once(&flag, print_string);
     call_once(&flag, print_string);
 
+    // A RIGHT sample for condition variables
     check_return(mtx_lock(&cond_mutex));
     check_return(cnd_wait(&cond, &cond_mutex));
     check_return(mtx_unlock(&cond_mutex));
-    printf("Thread %u is going to exit.\n", thrd_id);
+    printf("Thread %d is going to exit.\n", thrd_id);
 
-    thrd_exit(0);
+    // Return a specified code.
+    return thrd_id * thrd_id;
 }
 
 int main()
@@ -76,24 +112,33 @@ int main()
     cnd_init(&cond);
     mtx_init(&cond_mutex, mtx_plain);
 
-    thrd_t threads[THREADS_COUNT];
+    thrd_t threads[THREADS_COUNT] = { 0 };
     for (int i = 0; i < THREADS_COUNT; i++)
     {
-        check_return(thrd_create(&threads[i], thread_func, "Hello from thread %u!\n"));
+        void* arg = malloc(sizeof(int));
+        if (arg)
+        {
+            *(int*)arg = i;
+            // Pass the threads their own id
+            check_return(thrd_create(&threads[i], thread_func, arg));
+        }
     }
     printf("Hello from main!\n");
 
+    // Sleep and signal the threads
+    check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
     check_return(cnd_signal(&cond));
     check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
     check_return(cnd_signal(&cond));
     check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
     check_return(cnd_broadcast(&cond));
 
+    // Wait for the threads
     for (int i = 0; i < THREADS_COUNT; i++)
     {
         int res;
         check_return(thrd_join(threads[i], &res));
-        printf("The thread %u exit with code %d.\n", threads[i]._Id, res);
+        printf("The thread %d exit with code %d.\n", i, res);
     }
 
     mtx_destroy(&cond_mutex);
