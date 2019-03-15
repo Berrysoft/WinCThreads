@@ -33,9 +33,9 @@ typedef int(__stdcall* thrd_start_t)(void*);
 typedef _Thrd_t thrd_t;
 
 int thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg);
-int thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs);
+inline int thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs) { return lhs._Id == rhs._Id; }
 thrd_t thrd_current(void);
-int thrd_sleep(_In_ const struct timespec* duration, _Out_opt_ struct timespec* remaining);
+int thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining);
 inline void thrd_yield(void) { _Thrd_yield(); }
 __declspec(noreturn) void thrd_exit(_In_ int res);
 inline int thrd_detach(_In_ thrd_t thr) { return _Thrd_detach(thr); }
@@ -62,7 +62,7 @@ typedef union {
 
 #define ONCE_FLAG_INIT \
     {                  \
-        0              \
+        NULL           \
     }
 
 void call_once(_In_ once_flag* flag, _In_ void (*func)(void));
