@@ -1,5 +1,6 @@
 #include "threads.h"
 #include <Windows.h>
+#include <stdlib.h>
 
 static tss_dtor_t _Dtors[64 + 1024];
 
@@ -13,11 +14,34 @@ typedef struct _Tss_dtor_node
 static _Thread_local _Tss_dtor_node* _Dtor_head = NULL;
 static _Thread_local _Tss_dtor_node* _Dtor_tail = NULL;
 
+typedef struct
+{
+    thrd_start_t _Func;
+    void* _Arg;
+} _Thrd_start_arg;
+
+DWORD _Thrd_start(void* arg)
+{
+    _Thrd_start_arg* start_arg = arg;
+    int res = start_arg->_Func(start_arg->_Arg);
+    free(start_arg);
+    thrd_exit(res);
+}
+
 int thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg)
 {
-    thr->_Hnd = CreateThread(NULL, 0, func, arg, 0, &(thr->_Id));
+    thr->_Hnd = NULL;
+    _Thrd_start_arg* start_arg = malloc(sizeof(_Thrd_start_arg));
+    if (start_arg)
+    {
+        start_arg->_Func = func;
+        start_arg->_Arg = arg;
+        thr->_Hnd = CreateThread(NULL, 0, _Thrd_start, start_arg, 0, &(thr->_Id));
+    }
     if (!thr->_Hnd)
     {
+        if (start_arg)
+            free(start_arg);
         if (GetLastError() == ERROR_OUTOFMEMORY)
             return thrd_nomem;
         else
@@ -35,7 +59,7 @@ int thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining)
 {
     struct timespec t1;
     if (!timespec_get(&t1, TIME_UTC)) remaining = NULL;
-    DWORD r = !SleepEx((DWORD)duration->tv_sec * 1000 + duration->tv_nsec / 1000000, TRUE);
+    DWORD r = SleepEx((DWORD)duration->tv_sec * 1000 + duration->tv_nsec / 1000000, TRUE);
     if (!r) return 0;
     if (remaining)
     {

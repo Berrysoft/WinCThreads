@@ -28,7 +28,7 @@ enum
     thrd_error = _Thrd_error
 };
 
-typedef int(__stdcall* thrd_start_t)(void*);
+typedef int (*thrd_start_t)(void*);
 
 typedef _Thrd_t thrd_t;
 
