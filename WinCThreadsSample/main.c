@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <threads.h>
 
-static once_flag flag;
+static once_flag flag = ONCE_FLAG_INIT;
 
 void print_string(void) { printf("Hello once!\n"); }
 

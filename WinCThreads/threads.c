@@ -1,4 +1,5 @@
 #include "threads.h"
+#include <Windows.h>
 
 static tss_dtor_t _Dtors[64 + 1024];
 
@@ -78,7 +79,7 @@ BOOL _Init_once_callback(PINIT_ONCE initOnce, PVOID parameter, PVOID* context)
 
 void call_once(once_flag* flag, void (*func)(void))
 {
-    InitOnceExecuteOnce(flag, _Init_once_callback, func, NULL);
+    InitOnceExecuteOnce((PINIT_ONCE)flag, _Init_once_callback, func, NULL);
 }
 
 int tss_create(tss_t* tss_key, tss_dtor_t destructor)
@@ -108,14 +109,17 @@ int tss_set(tss_t tss_id, void* val)
 
 void tss_delete(tss_t tss_id)
 {
-    _Tss_dtor_node* node = malloc(sizeof(_Tss_dtor_node));
-    node->_Dtor = _Dtors[tss_id];
-    node->_Data = TlsGetValue(tss_id);
-    node->_Next = NULL;
-    if (!_Dtor_head)
-        _Dtor_head = node;
-    else
-        _Dtor_tail->_Next = node;
-    _Dtor_tail = node;
+    if (_Dtors[tss_id])
+    {
+        _Tss_dtor_node* node = malloc(sizeof(_Tss_dtor_node));
+        node->_Dtor = _Dtors[tss_id];
+        node->_Data = TlsGetValue(tss_id);
+        node->_Next = NULL;
+        if (!_Dtor_head)
+            _Dtor_head = node;
+        else
+            _Dtor_tail->_Next = node;
+        _Dtor_tail = node;
+    }
     TlsFree(tss_id);
 }
