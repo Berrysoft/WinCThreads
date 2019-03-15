@@ -1,3 +1,28 @@
+/**WinCThreads threads.h
+ * 
+ * MIT License
+ * 
+ * Copyright (c) 2019 Berrysoft
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ */
 #pragma once
 #ifndef _INC_THREADS
 #define _INC_THREADS
@@ -14,6 +39,8 @@
 #define END_EXTERN_C
 #endif // __cplusplus
 
+// Use this header to make the code simple.
+// Therefore I needn't write thrd, mtx or cnd myself.
 #include <thr/xthreads.h>
 #include <time.h>
 
@@ -28,6 +55,8 @@ enum
     thrd_error = _Thrd_error
 };
 
+// Thread
+
 typedef int (*thrd_start_t)(void*);
 
 typedef _Thrd_t thrd_t;
@@ -40,6 +69,8 @@ inline void thrd_yield(void) { _Thrd_yield(); }
 __declspec(noreturn) void thrd_exit(_In_ int res);
 inline int thrd_detach(_In_ thrd_t thr) { return _Thrd_detach(thr); }
 inline int thrd_join(_In_ thrd_t thr, _Out_opt_ int* res) { return _Thrd_join(thr, res); }
+
+// Mutex
 
 enum
 {
@@ -56,6 +87,9 @@ inline int mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespe
 inline int mtx_unlock(_In_ mtx_t* mutex) { return _Mtx_unlock(*mutex); }
 inline void mtx_destroy(_In_ mtx_t* mutex) { _Mtx_destroy(*mutex); }
 
+// Call-once
+
+// The declaration or INIT_ONCE
 typedef union {
     void* _Ptr;
 } once_flag;
@@ -67,6 +101,8 @@ typedef union {
 
 void call_once(_In_ once_flag* flag, _In_ void (*func)(void));
 
+// Condition varible
+
 typedef _Cnd_t cnd_t;
 
 inline int cnd_init(_Out_ cnd_t* cond) { return _Cnd_init(cond); }
@@ -76,12 +112,16 @@ inline int cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex) { return _Cnd_wait(*con
 inline int cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point) { return _Cnd_timedwait(*cond, *mutex, (const xtime*)time_point); }
 inline void cnd_destroy(_In_ cnd_t* cond) { _Cnd_destroy(*cond); }
 
+// This keyword hasn't been implemented by MSVC
 #define _Thread_local __declspec(thread)
+// There's already thread_local in C++
 #ifndef __cpluscplus
 #define thread_local _Thread_local
 #endif // !__cpluscplus
 
-#define TSS_DTOR_ITERATIONS 256
+// Thread special storage
+
+#define TSS_DTOR_ITERATIONS 4
 
 typedef void (*tss_dtor_t)(void*);
 

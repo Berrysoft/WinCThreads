@@ -13,21 +13,28 @@ void check_return(int res)
 once_flag flag = ONCE_FLAG_INIT;
 void print_string(void) { printf("Hello once!\n"); }
 
-/*thread_local*/ int globalInt;
+int globalInt;
 mtx_t mutex;
+thread_local unsigned int thrd_id;
 
 cnd_t cond;
 mtx_t cond_mutex;
 
-void free_print(void* p)
+void free_print_1(void* p)
 {
     free(p);
-    printf("Freed: %p\n", p);
+    printf("Freed_1: %p\n", p);
+}
+void free_print_2(void* p)
+{
+    free(p);
+    printf("Freed_2: %p\n", p);
 }
 
 int thread_func(void* arg)
 {
-    printf(arg, thrd_current()._Id);
+    thrd_id = thrd_current()._Id;
+    printf(arg, thrd_id);
 
     int m = 5;
     while (m--)
@@ -43,9 +50,10 @@ int thread_func(void* arg)
     printf("globalInt == %d\n", globalInt);
 
     tss_t key;
-    check_return(tss_create(&key, free_print));
+    check_return(tss_create(&key, globalInt % 2 == 0 ? free_print_1 : free_print_2));
+    assert(tss_get(key) == NULL);
     check_return(tss_set(key, malloc(sizeof(unsigned int))));
-    *(unsigned int*)tss_get(key) = thrd_current()._Id;
+    *(unsigned int*)tss_get(key) = thrd_id;
     printf("TSS address: %p\tvalue: %u\n", tss_get(key), *(unsigned int*)tss_get(key));
     tss_delete(key);
 
@@ -56,7 +64,7 @@ int thread_func(void* arg)
     check_return(mtx_lock(&cond_mutex));
     check_return(cnd_wait(&cond, &cond_mutex));
     check_return(mtx_unlock(&cond_mutex));
-    printf("Thread %u is going to exit.\n", thrd_current()._Id);
+    printf("Thread %u is going to exit.\n", thrd_id);
 
     thrd_exit(0);
 }
