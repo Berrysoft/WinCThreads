@@ -1,7 +1,6 @@
 #include "threads.h"
 
-// TODO: Add mutex for dtors.
-tss_dtor_t _Dtors[64 + 1024];
+static tss_dtor_t _Dtors[64 + 1024];
 
 typedef struct _Tss_dtor_node
 {
@@ -10,8 +9,8 @@ typedef struct _Tss_dtor_node
     struct _Tss_dtor_node* _Next;
 } _Tss_dtor_node;
 
-_Thread_local _Tss_dtor_node* _Dtor_head = NULL;
-_Thread_local _Tss_dtor_node* _Dtor_tail = NULL;
+static _Thread_local _Tss_dtor_node* _Dtor_head = NULL;
+static _Thread_local _Tss_dtor_node* _Dtor_tail = NULL;
 
 int thrd_create(thrd_t* thr, thrd_start_t func, void* arg)
 {
