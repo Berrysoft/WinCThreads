@@ -39,60 +39,66 @@
 #define END_EXTERN_C
 #endif // __cplusplus
 
-// Use this header to make the code simple.
-// Therefore I needn't write thrd, mtx or cnd myself.
-#include <thr/xthreads.h>
+#include <Windows.h>
+#include <stdbool.h>
 #include <time.h>
 
 BEGIN_EXTERN_C
 
 enum
 {
-    thrd_success = _Thrd_success,
-    thrd_nomem = _Thrd_nomem,
-    thrd_timedout = _Thrd_timedout,
-    thrd_busy = _Thrd_busy,
-    thrd_error = _Thrd_error
+    thrd_success,
+    thrd_nomem,
+    thrd_timedout,
+    thrd_busy,
+    thrd_error
 };
 
 // Thread
 
 typedef int(__cdecl* thrd_start_t)(void*);
 
-typedef _Thrd_t thrd_t;
+typedef HANDLE thrd_t;
 
 int __cdecl thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg);
-inline int __cdecl thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs) { return lhs._Id == rhs._Id; }
+int __cdecl thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs);
 thrd_t __cdecl thrd_current(void);
 int __cdecl thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining);
-inline void __cdecl thrd_yield(void) { _Thrd_yield(); }
+void __cdecl thrd_yield(void);
 __declspec(noreturn) void __cdecl thrd_exit(_In_ int res);
-inline int __cdecl thrd_detach(_In_ thrd_t thr) { return _Thrd_detach(thr); }
-inline int __cdecl thrd_join(_In_ thrd_t thr, _Out_opt_ int* res) { return _Thrd_join(thr, res); }
+int __cdecl thrd_detach(_In_ thrd_t thr);
+int __cdecl thrd_join(_In_ thrd_t thr, int* res);
 
 // Mutex
 
 enum
 {
-    mtx_plain = _Mtx_plain,
-    mtx_recursive = _Mtx_recursive,
-    mtx_timed = _Mtx_timed
+    mtx_plain = 0x1,
+    mtx_recursive = 0x4,
+    mtx_timed = 0x100
 };
 
-typedef _Mtx_t mtx_t;
+typedef struct
+{
+    union {
+        CRITICAL_SECTION cs;
+        HANDLE mutex;
+    } obj;
+    bool locked;
+    bool timed;
+    bool recursive;
+} mtx_t;
 
-inline int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type) { return _Mtx_init(mutex, type); }
-inline int __cdecl mtx_lock(_In_ mtx_t* mutex) { return _Mtx_lock(*mutex); }
-inline int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point) { return _Mtx_timedlock(*mutex, (const xtime*)time_point); }
-inline int __cdecl mtx_unlock(_In_ mtx_t* mutex) { return _Mtx_unlock(*mutex); }
-inline void __cdecl mtx_destroy(_In_ mtx_t* mutex) { _Mtx_destroy(*mutex); }
+int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type);
+int __cdecl mtx_lock(_In_ mtx_t* mutex);
+int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
+int __cdecl mtx_trylock(_In_ mtx_t* mutex);
+int __cdecl mtx_unlock(_In_ mtx_t* mutex);
+void __cdecl mtx_destroy(_In_ mtx_t* mutex);
 
 // Call-once
 
-// The declaration or INIT_ONCE
-typedef union {
-    void* _Ptr;
-} once_flag;
+typedef INIT_ONCE once_flag;
 
 #define ONCE_FLAG_INIT \
     {                  \
@@ -103,14 +109,18 @@ void __cdecl call_once(_In_ once_flag* flag, _In_ void(__cdecl* func)(void));
 
 // Condition varible
 
-typedef _Cnd_t cnd_t;
+typedef struct
+{
+    CONDITION_VARIABLE cv;
+    CRITICAL_SECTION cs;
+} cnd_t;
 
-inline int __cdecl cnd_init(_Out_ cnd_t* cond) { return _Cnd_init(cond); }
-inline int __cdecl cnd_signal(_In_ cnd_t* cond) { return _Cnd_signal(*cond); }
-inline int __cdecl cnd_broadcast(_In_ cnd_t* cond) { return _Cnd_broadcast(*cond); }
-inline int __cdecl cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex) { return _Cnd_wait(*cond, *mutex); }
-inline int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point) { return _Cnd_timedwait(*cond, *mutex, (const xtime*)time_point); }
-inline void __cdecl cnd_destroy(_In_ cnd_t* cond) { _Cnd_destroy(*cond); }
+int __cdecl cnd_init(_Out_ cnd_t* cond);
+int __cdecl cnd_signal(_In_ cnd_t* cond);
+int __cdecl cnd_broadcast(_In_ cnd_t* cond);
+int __cdecl cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex);
+int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
+void __cdecl cnd_destroy(_In_ cnd_t* cond);
 
 // This keyword hasn't been implemented by MSVC
 #define _Thread_local __declspec(thread)
@@ -125,7 +135,7 @@ inline void __cdecl cnd_destroy(_In_ cnd_t* cond) { _Cnd_destroy(*cond); }
 
 typedef void(__cdecl* tss_dtor_t)(void*);
 
-typedef unsigned long tss_t;
+typedef DWORD tss_t;
 
 int __cdecl tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor);
 void* __cdecl tss_get(_In_ tss_t tss_key);

@@ -49,13 +49,13 @@ mtx_t cond_mutex;
 // Two different free functions
 void free_print_1(void* p)
 {
-    free(p);
     printf("Free_1: %p\n", p);
+    free(p);
 }
 void free_print_2(void* p)
 {
-    free(p);
     printf("Free_2: %p\n", p);
+    free(p);
 }
 
 int thread_func(void* arg)
@@ -110,9 +110,9 @@ int thread_func(void* arg)
 int main()
 {
     globalInt = 0;
-    mtx_init(&mutex, mtx_plain);
-    cnd_init(&cond);
-    mtx_init(&cond_mutex, mtx_plain);
+    check_return(mtx_init(&mutex, mtx_timed | mtx_recursive));
+    check_return(cnd_init(&cond));
+    check_return(mtx_init(&cond_mutex, mtx_plain));
 
     thrd_t threads[THREADS_COUNT] = { 0 };
     for (int i = 0; i < THREADS_COUNT; i++)
@@ -139,6 +139,7 @@ int main()
     for (int i = 0; i < THREADS_COUNT; i++)
     {
         int res;
+        _Analysis_assume_(threads[i] != NULL);
         check_return(thrd_join(threads[i], &res));
         printf("The thread %d exit with code %d.\n", i, res);
     }
