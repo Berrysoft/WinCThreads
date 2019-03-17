@@ -140,7 +140,7 @@ thrd_t __cdecl thrd_current(void)
     return GetCurrentThread();
 }
 
-void _Timespec_setvalid(struct timespec* t)
+static void _Timespec_setvalid(struct timespec* t)
 {
     while (t->tv_nsec < 0)
     {
@@ -149,7 +149,7 @@ void _Timespec_setvalid(struct timespec* t)
     }
 }
 
-struct timespec _Timespec_duration(const struct timespec* time_point)
+static struct timespec _Timespec_duration(const struct timespec* time_point)
 {
     struct timespec current;
     if (!timespec_get(&current, TIME_UTC))
@@ -165,7 +165,7 @@ struct timespec _Timespec_duration(const struct timespec* time_point)
     return span;
 }
 
-DWORD _Timespec_ms(const struct timespec* span)
+static DWORD _Timespec_ms(const struct timespec* span)
 {
     time_t ms = span->tv_sec * 1000 + span->tv_nsec / 1000000;
     if (ms < 0) ms = 0;
@@ -248,7 +248,7 @@ int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type)
     return thrd_success;
 }
 
-int _Mtx_non_recursive_lock(_In_ mtx_t* mutex)
+static int _Mtx_non_recursive_lock(_In_ mtx_t* mutex)
 {
     if (!mutex->recursive)
     {
@@ -416,7 +416,7 @@ int __cdecl cnd_broadcast(_In_ cnd_t* cond)
     return thrd_success;
 }
 
-int _Cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
+static int _Cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
 {
     bool usemutex = mutex->basetype == mtx_timed || !mutex->recursive;
     if (usemutex)
@@ -463,7 +463,7 @@ int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mu
     return _Cnd_wait(cond, mutex, _Timespec_ms(&span));
 }
 
-int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
+static int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
 {
     if (mutex->basetype != mtx_shared) return thrd_error;
     if (SleepConditionVariableSRW(&cond->cv, &mutex->obj.shared, ms, CONDITION_VARIABLE_LOCKMODE_SHARED))
