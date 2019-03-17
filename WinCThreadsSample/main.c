@@ -98,9 +98,9 @@ int thread_func(void* arg)
     call_once(&flag, print_string);
 
     // A RIGHT sample for condition variables
-    check_return(mtx_lock(&cond_mutex));
-    check_return(cnd_wait(&cond, &cond_mutex));
-    check_return(mtx_unlock(&cond_mutex));
+    check_return(mtx_slock(&cond_mutex));
+    check_return(cnd_swait(&cond, &cond_mutex));
+    check_return(mtx_sunlock(&cond_mutex));
     printf("Thread %d is going to exit.\n", thrd_id);
 
     // Return a specified code.
@@ -112,7 +112,7 @@ int main()
     globalInt = 0;
     check_return(mtx_init(&mutex, mtx_timed | mtx_recursive));
     check_return(cnd_init(&cond));
-    check_return(mtx_init(&cond_mutex, mtx_plain));
+    check_return(mtx_init(&cond_mutex, mtx_shared | mtx_recursive));
 
     thrd_t threads[THREADS_COUNT] = { 0 };
     for (int i = 0; i < THREADS_COUNT; i++)

@@ -228,18 +228,22 @@ int __cdecl thrd_join(_In_ thrd_t thr, int* res)
 
 int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type)
 {
-    mutex->timed = type & mtx_timed;
     mutex->recursive = type & mtx_recursive;
+    mutex->basetype = type & (~mtx_recursive);
     mutex->locked = false;
-    if (mutex->timed)
+    switch (mutex->basetype)
     {
+    case mtx_plain:
+        InitializeCriticalSection(&mutex->obj.cs);
+        break;
+    case mtx_shared:
+        InitializeSRWLock(&mutex->obj.shared);
+        break;
+    case mtx_timed:
         mutex->obj.mutex = CreateMutex(NULL, FALSE, NULL);
         if (!mutex->obj.mutex)
             return thrd_error;
-    }
-    else
-    {
-        InitializeCriticalSection(&mutex->obj.cs);
+        break;
     }
     return thrd_success;
 }
@@ -256,21 +260,32 @@ int _Mtx_non_recursive_lock(_In_ mtx_t* mutex)
 
 int __cdecl mtx_lock(_In_ mtx_t* mutex)
 {
-    if (mutex->timed)
+    switch (mutex->basetype)
     {
+    case mtx_plain:
+        EnterCriticalSection(&mutex->obj.cs);
+        break;
+    case mtx_shared:
+        AcquireSRWLockExclusive(&mutex->obj.shared);
+        break;
+    case mtx_timed:
         if (WaitForSingleObject(mutex->obj.mutex, INFINITE))
             return thrd_error;
-    }
-    else
-    {
-        EnterCriticalSection(&mutex->obj.cs);
+        break;
     }
     return _Mtx_non_recursive_lock(mutex);
 }
 
+int __cdecl mtx_slock(_In_ mtx_t* mutex)
+{
+    if (mutex->basetype != mtx_shared) return thrd_error;
+    AcquireSRWLockShared(&mutex->obj.shared);
+    return thrd_success;
+}
+
 int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point)
 {
-    if (!mutex->timed) return thrd_error;
+    if (mutex->basetype != mtx_timed) return thrd_error;
     struct timespec span = _Timespec_duration(time_point);
     DWORD r = WaitForSingleObject(mutex->obj.mutex, _Timespec_ms(&span));
     if (r)
@@ -285,48 +300,83 @@ int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timesp
 
 int __cdecl mtx_trylock(_In_ mtx_t* mutex)
 {
-    int r;
-    if (mutex->timed)
+    int r = thrd_success;
+    switch (mutex->basetype)
     {
-        r = WaitForSingleObject(mutex->obj.mutex, 0) ? thrd_busy : thrd_success;
-    }
-    else
-    {
-        r = TryEnterCriticalSection(&mutex->obj.cs) ? thrd_success : thrd_busy;
-        if (!mutex->recursive)
-        {
-            if (!r) mutex->locked = true;
+    case mtx_plain:
+        if (!TryEnterCriticalSection(&mutex->obj.cs))
             r = thrd_busy;
+        else if (!mutex->recursive)
+        {
+            if (mutex->locked)
+            {
+                LeaveCriticalSection(&mutex->obj.cs);
+                r = thrd_busy;
+            }
+            else
+            {
+                mutex->locked = true;
+            }
         }
+        break;
+    case mtx_shared:
+        if (!TryAcquireSRWLockExclusive(&mutex->obj.shared)) r = thrd_busy;
+        break;
+    case mtx_timed:
+        if (WaitForSingleObject(mutex->obj.mutex, 0)) r = thrd_busy;
+        break;
     }
     return r;
+}
+
+int __cdecl mtx_tryslock(_In_ mtx_t* mutex)
+{
+    if (mutex->basetype != mtx_shared) return thrd_error;
+    if (TryAcquireSRWLockShared(&mutex->obj.shared))
+        return thrd_success;
+    else
+        return thrd_busy;
 }
 
 int __cdecl mtx_unlock(_In_ mtx_t* mutex)
 {
     mutex->locked = false;
-    if (mutex->timed)
+    switch (mutex->basetype)
     {
+    case mtx_plain:
+        LeaveCriticalSection(&mutex->obj.cs);
+        break;
+    case mtx_shared:
+        ReleaseSRWLockExclusive(&mutex->obj.shared);
+        break;
+    case mtx_timed:
         if (!ReleaseMutex(mutex->obj.mutex))
             return thrd_error;
+        break;
     }
-    else
-    {
-        LeaveCriticalSection(&mutex->obj.cs);
-    }
+    return thrd_success;
+}
+
+int __cdecl mtx_sunlock(_In_ mtx_t* mutex)
+{
+    if (mutex->basetype != mtx_shared) return thrd_error;
+    ReleaseSRWLockShared(&mutex->obj.shared);
     return thrd_success;
 }
 
 void __cdecl mtx_destroy(_In_ mtx_t* mutex)
 {
-    if (mutex->timed)
+    switch (mutex->basetype)
+    {
+    case mtx_plain:
+        DeleteCriticalSection(&mutex->obj.cs);
+        break;
+    case mtx_timed:
     {
         BOOL r = CloseHandle(mutex->obj.mutex);
         assert(r);
+        break;
     }
-    else
-    {
-        DeleteCriticalSection(&mutex->obj.cs);
     }
 }
 
@@ -366,12 +416,25 @@ int __cdecl cnd_broadcast(_In_ cnd_t* cond)
     return thrd_success;
 }
 
-int _Cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex, DWORD ms)
+int _Cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
 {
-    if (mtx_unlock(mutex)) return thrd_error;
+    bool usemutex = mutex->basetype == mtx_timed || !mutex->recursive;
+    if (usemutex)
+    {
+        if (mtx_unlock(mutex)) return thrd_error;
+        EnterCriticalSection(&cond->cs);
+    }
+    bool succeed;
+    if (mutex->basetype != mtx_shared || usemutex)
+    {
+        succeed = SleepConditionVariableCS(&cond->cv, usemutex ? &cond->cs : &mutex->obj.cs, ms);
+    }
+    else
+    {
+        succeed = SleepConditionVariableSRW(&cond->cv, &mutex->obj.shared, ms, 0);
+    }
     int ret;
-    EnterCriticalSection(&cond->cs);
-    if (SleepConditionVariableCS(&cond->cv, &cond->cs, ms))
+    if (succeed)
         ret = thrd_success;
     else
     {
@@ -381,12 +444,15 @@ int _Cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex, DWORD ms)
         else
             ret = thrd_error;
     }
-    LeaveCriticalSection(&cond->cs);
-    if (mtx_lock(mutex)) return thrd_error;
+    if (usemutex)
+    {
+        LeaveCriticalSection(&cond->cs);
+        if (mtx_lock(mutex)) return thrd_error;
+    }
     return ret;
 }
 
-int __cdecl cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex)
+int __cdecl cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex)
 {
     return _Cnd_wait(cond, mutex, INFINITE);
 }
@@ -395,6 +461,32 @@ int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mu
 {
     struct timespec span = _Timespec_duration(time_point);
     return _Cnd_wait(cond, mutex, _Timespec_ms(&span));
+}
+
+int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
+{
+    if (mutex->basetype != mtx_shared) return thrd_error;
+    if (SleepConditionVariableSRW(&cond->cv, &mutex->obj.shared, ms, CONDITION_VARIABLE_LOCKMODE_SHARED))
+        return thrd_success;
+    else
+    {
+        DWORD r = GetLastError();
+        if (r == ERROR_TIMEOUT)
+            return thrd_timedout;
+        else
+            return thrd_error;
+    }
+}
+
+int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex)
+{
+    return _Cnd_swait(cond, mutex, INFINITE);
+}
+
+int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point)
+{
+    struct timespec span = _Timespec_duration(time_point);
+    return _Cnd_swait(cond, mutex, _Timespec_ms(&span));
 }
 
 void __cdecl cnd_destroy(_In_ cnd_t* cond)
@@ -416,12 +508,12 @@ int __cdecl tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor)
     }
 }
 
-void* __cdecl tss_get(_In_ tss_t tss_key)
+void* __cdecl tss_get(tss_t tss_key)
 {
     return TlsGetValue(tss_key);
 }
 
-int __cdecl tss_set(_In_ tss_t tss_id, _In_opt_ void* val)
+int __cdecl tss_set(tss_t tss_id, _In_opt_ void* val)
 {
     if (TlsSetValue(tss_id, val))
         return thrd_success;
@@ -429,7 +521,7 @@ int __cdecl tss_set(_In_ tss_t tss_id, _In_opt_ void* val)
         return thrd_error;
 }
 
-void __cdecl tss_delete(_In_ tss_t tss_id)
+void __cdecl tss_delete(tss_t tss_id)
 {
     _Dtors[tss_id] = NULL;
     BOOL r = TlsSetValue(tss_id, NULL);

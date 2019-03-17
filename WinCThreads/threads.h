@@ -74,8 +74,9 @@ int __cdecl thrd_join(_In_ thrd_t thr, int* res);
 enum
 {
     mtx_plain = 0x1,
-    mtx_recursive = 0x4,
-    mtx_timed = 0x100
+    mtx_shared = 0x2, // Non-standard extension
+    mtx_timed = 0x3,
+    mtx_recursive = 0x4
 };
 
 typedef struct
@@ -83,17 +84,21 @@ typedef struct
     union {
         CRITICAL_SECTION cs;
         HANDLE mutex;
+        SRWLOCK shared;
     } obj;
+    int basetype;
     bool locked;
-    bool timed;
     bool recursive;
 } mtx_t;
 
 int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type);
 int __cdecl mtx_lock(_In_ mtx_t* mutex);
+int __cdecl mtx_slock(_In_ mtx_t* mutex); // Non-standard extension
 int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
 int __cdecl mtx_trylock(_In_ mtx_t* mutex);
+int __cdecl mtx_tryslock(_In_ mtx_t* mutex); // Non-standard extension
 int __cdecl mtx_unlock(_In_ mtx_t* mutex);
+int __cdecl mtx_sunlock(_In_ mtx_t* mutex); // Non-standard extension
 void __cdecl mtx_destroy(_In_ mtx_t* mutex);
 
 // Call-once
@@ -118,8 +123,10 @@ typedef struct
 int __cdecl cnd_init(_Out_ cnd_t* cond);
 int __cdecl cnd_signal(_In_ cnd_t* cond);
 int __cdecl cnd_broadcast(_In_ cnd_t* cond);
-int __cdecl cnd_wait(_In_ cnd_t* cond, _In_ mtx_t* mutex);
+int __cdecl cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex);
 int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
+int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex); // Non-standard extension
+int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point); // Non-standard extension
 void __cdecl cnd_destroy(_In_ cnd_t* cond);
 
 // This keyword hasn't been implemented by MSVC
@@ -138,9 +145,9 @@ typedef void(__cdecl* tss_dtor_t)(void*);
 typedef DWORD tss_t;
 
 int __cdecl tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor);
-void* __cdecl tss_get(_In_ tss_t tss_key);
-int __cdecl tss_set(_In_ tss_t tss_id, _In_opt_ void* val);
-void __cdecl tss_delete(_In_ tss_t tss_id);
+void* __cdecl tss_get(tss_t tss_key);
+int __cdecl tss_set(tss_t tss_id, _In_opt_ void* val);
+void __cdecl tss_delete(tss_t tss_id);
 
 END_EXTERN_C
 
