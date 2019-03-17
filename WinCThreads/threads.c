@@ -69,7 +69,8 @@ static void _Tss_clear_all(void)
                 void* value = TlsGetValue(current->_Key);
                 if (value)
                 {
-                    TlsSetValue(current->_Key, NULL);
+                    BOOL r = TlsSetValue(current->_Key, NULL);
+                    assert(r);
                     again = true;
                     _Dtors[current->_Key](value);
                 }
@@ -80,7 +81,8 @@ static void _Tss_clear_all(void)
     while (current)
     {
         _Tss_dtor_id_node* next = current->_Next;
-        TlsFree(current->_Key);
+        BOOL r = TlsFree(current->_Key);
+        assert(r);
         free(current);
         current = next;
     }
