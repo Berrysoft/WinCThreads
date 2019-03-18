@@ -256,8 +256,8 @@ static int _Mtx_non_recursive_lock(_In_ mtx_t* mutex)
     if (!mutex->recursive)
     {
         while (mutex->locked) Sleep(1);
-        mutex->locked = true;
     }
+    mutex->locked = true;
     return thrd_success;
 }
 
@@ -303,24 +303,15 @@ int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timesp
 
 int __cdecl mtx_trylock(_In_ mtx_t* mutex)
 {
+    if (!mutex->recursive && mutex->locked)
+    {
+        return thrd_busy;
+    }
     int r = thrd_success;
     switch (mutex->basetype)
     {
     case mtx_plain:
-        if (!TryEnterCriticalSection(&mutex->obj.cs))
-            r = thrd_busy;
-        else if (!mutex->recursive)
-        {
-            if (mutex->locked)
-            {
-                LeaveCriticalSection(&mutex->obj.cs);
-                r = thrd_busy;
-            }
-            else
-            {
-                mutex->locked = true;
-            }
-        }
+        if (!TryEnterCriticalSection(&mutex->obj.cs)) r = thrd_busy;
         break;
     case mtx_shared:
         if (!TryAcquireSRWLockExclusive(&mutex->obj.shared)) r = thrd_busy;
@@ -329,6 +320,7 @@ int __cdecl mtx_trylock(_In_ mtx_t* mutex)
         if (WaitForSingleObject(mutex->obj.mutex, 0)) r = thrd_busy;
         break;
     }
+    if (!r) mutex->locked = true;
     return r;
 }
 

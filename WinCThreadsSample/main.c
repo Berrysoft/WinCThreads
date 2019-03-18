@@ -110,7 +110,7 @@ int thread_func(void* arg)
 int main()
 {
     globalInt = 0;
-    check_return(mtx_init(&mutex, mtx_timed | mtx_recursive));
+    check_return(mtx_init(&mutex, mtx_timed));
     check_return(cnd_init(&cond));
     check_return(mtx_init(&cond_mutex, mtx_shared | mtx_recursive));
 
