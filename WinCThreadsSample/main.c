@@ -41,7 +41,7 @@ once_flag flag = ONCE_FLAG_INIT;
 void print_string(void) { printf("Hello once!\n"); }
 
 int globalInt;
-mtx_t mutex;
+smph_t sem;
 
 cnd_t cond;
 mtx_t cond_mutex;
@@ -60,8 +60,7 @@ void free_print_2(void* p)
 
 int thread_func(void* arg)
 {
-    int thrd_id = *(int*)arg;
-    free(arg);
+    int thrd_id = (int)(long long)arg;
     printf("Hello from thread %d!\n", thrd_id);
 
     int m = 5;
@@ -69,13 +68,13 @@ int thread_func(void* arg)
     {
         // If not locked, you may get 5 in the end.
         // But actually we want 5 * THREADS_COUNT == 20 here.
-        check_return(mtx_lock(&mutex));
+        check_return(smph_wait(&sem));
 
         int t = globalInt;
         check_return(thrd_sleep(&(struct timespec){ .tv_nsec = 10000000 }, NULL));
         globalInt = ++t;
 
-        check_return(mtx_unlock(&mutex));
+        check_return(smph_post(&sem));
     }
     printf("globalInt == %d\n", globalInt);
 
@@ -110,22 +109,20 @@ int thread_func(void* arg)
 int main()
 {
     globalInt = 0;
-    check_return(mtx_init(&mutex, mtx_timed));
+    check_return(smph_init(&sem, 1, 0));
     check_return(cnd_init(&cond));
     check_return(mtx_init(&cond_mutex, mtx_shared | mtx_recursive));
 
     thrd_t threads[THREADS_COUNT] = { 0 };
     for (int i = 0; i < THREADS_COUNT; i++)
     {
-        void* arg = malloc(sizeof(int));
-        if (arg)
-        {
-            *(int*)arg = i;
-            // Pass the threads their own id
-            check_return(thrd_create(&threads[i], thread_func, arg));
-        }
+        // Pass the threads their own id
+        check_return(thrd_create(&threads[i], thread_func, (void*)(long long)i));
     }
     printf("Hello from main!\n");
+
+    check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
+    check_return(smph_post(&sem));
 
     // Sleep and signal the threads
     check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
@@ -146,6 +143,6 @@ int main()
 
     mtx_destroy(&cond_mutex);
     cnd_destroy(&cond);
-    mtx_destroy(&mutex);
+    smph_destroy(&sem);
     return 0;
 }

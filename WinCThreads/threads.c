@@ -489,6 +489,64 @@ void __cdecl cnd_destroy(_In_ cnd_t* cond)
     DeleteCriticalSection(&cond->cs);
 }
 
+int __cdecl smph_init(_Out_ smph_t* sem, int max_count, int count)
+{
+    *sem = CreateSemaphore(NULL, count, max_count, NULL);
+    if (*sem)
+        return thrd_success;
+    else
+        return thrd_error;
+}
+
+static int _Smph_wait(_In_ smph_t* sem, DWORD ms)
+{
+    DWORD r = WaitForSingleObject(*sem, ms);
+    if (!r)
+        return thrd_success;
+    else
+    {
+        if (r == WAIT_TIMEOUT)
+            return thrd_timedout;
+        else
+            return thrd_error;
+    }
+}
+
+int __cdecl smph_wait(_In_ smph_t* sem)
+{
+    return _Smph_wait(sem, INFINITE);
+}
+
+int __cdecl smph_timedwait(_In_ smph_t* __restrict sem, _In_ const struct timespec* __restrict time_point)
+{
+    struct timespec span = _Timespec_duration(time_point);
+    return _Smph_wait(sem, _Timespec_ms(&span));
+}
+
+int __cdecl smph_trywait(_In_ smph_t* sem)
+{
+    return _Smph_wait(sem, 0);
+}
+
+int __cdecl smph_post(_In_ smph_t* sem)
+{
+    return smph_multipost(sem, 1);
+}
+
+int __cdecl smph_multipost(_In_ smph_t* sem, int count)
+{
+    if (ReleaseSemaphore(*sem, count, NULL))
+        return thrd_success;
+    else
+        return thrd_error;
+}
+
+void __cdecl smph_destroy(_In_ smph_t* sem)
+{
+    BOOL r = CloseHandle(*sem);
+    assert(r);
+}
+
 int __cdecl tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor)
 {
     *tss_key = TlsAlloc();

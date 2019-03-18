@@ -135,8 +135,22 @@ THREADS_API int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __res
 THREADS_API int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point); // Non-standard extension
 THREADS_API void __cdecl cnd_destroy(_In_ cnd_t* cond);
 
+// Semaphore - non standard extension
+
+typedef HANDLE smph_t;
+THREADS_API int __cdecl smph_init(_Out_ smph_t* sem, int max_count, int count);
+THREADS_API int __cdecl smph_wait(_In_ smph_t* sem);
+THREADS_API int __cdecl smph_timedwait(_In_ smph_t* __restrict sem, _In_ const struct timespec* __restrict time_point);
+THREADS_API int __cdecl smph_trywait(_In_ smph_t* sem);
+THREADS_API int __cdecl smph_post(_In_ smph_t* sem);
+THREADS_API int __cdecl smph_multipost(_In_ smph_t* sem, int count);
+THREADS_API void __cdecl smph_destroy(_In_ smph_t* sem);
+
+#ifdef _MSC_VER
 // This keyword hasn't been implemented by MSVC
 #define _Thread_local __declspec(thread)
+#endif // _MSC_VER
+
 // There's already thread_local in C++
 #ifndef __cpluscplus
 #define thread_local _Thread_local
