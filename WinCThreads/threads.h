@@ -29,6 +29,12 @@
 
 #ifndef __STDC_NO_THREADS__
 
+#ifdef WINCTHREADS_EXPOTRS
+#define THREADS_API __declspec(dllexport)
+#else
+#define THREADS_API __declspec(dllimport)
+#endif
+
 #ifdef __cplusplus
 #define BEGIN_EXTERN_C \
     extern "C"         \
@@ -60,14 +66,14 @@ typedef int(__cdecl* thrd_start_t)(void*);
 
 typedef HANDLE thrd_t;
 
-int __cdecl thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg);
-int __cdecl thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs);
-thrd_t __cdecl thrd_current(void);
-int __cdecl thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining);
-void __cdecl thrd_yield(void);
-__declspec(noreturn) void __cdecl thrd_exit(_In_ int res);
-int __cdecl thrd_detach(_In_ thrd_t thr);
-int __cdecl thrd_join(_In_ thrd_t thr, int* res);
+THREADS_API int __cdecl thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void* arg);
+THREADS_API int __cdecl thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs);
+THREADS_API thrd_t __cdecl thrd_current(void);
+THREADS_API int __cdecl thrd_sleep(_In_ const struct timespec* duration, struct timespec* remaining);
+THREADS_API void __cdecl thrd_yield(void);
+THREADS_API __declspec(noreturn) void __cdecl thrd_exit(_In_ int res);
+THREADS_API int __cdecl thrd_detach(_In_ thrd_t thr);
+THREADS_API int __cdecl thrd_join(_In_ thrd_t thr, int* res);
 
 // Mutex
 
@@ -91,15 +97,15 @@ typedef struct
     bool recursive;
 } mtx_t;
 
-int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type);
-int __cdecl mtx_lock(_In_ mtx_t* mutex);
-int __cdecl mtx_slock(_In_ mtx_t* mutex); // Non-standard extension
-int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
-int __cdecl mtx_trylock(_In_ mtx_t* mutex);
-int __cdecl mtx_tryslock(_In_ mtx_t* mutex); // Non-standard extension
-int __cdecl mtx_unlock(_In_ mtx_t* mutex);
-int __cdecl mtx_sunlock(_In_ mtx_t* mutex); // Non-standard extension
-void __cdecl mtx_destroy(_In_ mtx_t* mutex);
+THREADS_API int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type);
+THREADS_API int __cdecl mtx_lock(_In_ mtx_t* mutex);
+THREADS_API int __cdecl mtx_slock(_In_ mtx_t* mutex); // Non-standard extension
+THREADS_API int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
+THREADS_API int __cdecl mtx_trylock(_In_ mtx_t* mutex);
+THREADS_API int __cdecl mtx_tryslock(_In_ mtx_t* mutex); // Non-standard extension
+THREADS_API int __cdecl mtx_unlock(_In_ mtx_t* mutex);
+THREADS_API int __cdecl mtx_sunlock(_In_ mtx_t* mutex); // Non-standard extension
+THREADS_API void __cdecl mtx_destroy(_In_ mtx_t* mutex);
 
 // Call-once
 
@@ -110,7 +116,7 @@ typedef INIT_ONCE once_flag;
         NULL           \
     }
 
-void __cdecl call_once(_In_ once_flag* flag, _In_ void(__cdecl* func)(void));
+THREADS_API void __cdecl call_once(_In_ once_flag* flag, _In_ void(__cdecl* func)(void));
 
 // Condition varible
 
@@ -120,14 +126,14 @@ typedef struct
     CRITICAL_SECTION cs;
 } cnd_t;
 
-int __cdecl cnd_init(_Out_ cnd_t* cond);
-int __cdecl cnd_signal(_In_ cnd_t* cond);
-int __cdecl cnd_broadcast(_In_ cnd_t* cond);
-int __cdecl cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex);
-int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
-int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex); // Non-standard extension
-int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point); // Non-standard extension
-void __cdecl cnd_destroy(_In_ cnd_t* cond);
+THREADS_API int __cdecl cnd_init(_Out_ cnd_t* cond);
+THREADS_API int __cdecl cnd_signal(_In_ cnd_t* cond);
+THREADS_API int __cdecl cnd_broadcast(_In_ cnd_t* cond);
+THREADS_API int __cdecl cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex);
+THREADS_API int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
+THREADS_API int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex); // Non-standard extension
+THREADS_API int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point); // Non-standard extension
+THREADS_API void __cdecl cnd_destroy(_In_ cnd_t* cond);
 
 // This keyword hasn't been implemented by MSVC
 #define _Thread_local __declspec(thread)
@@ -144,10 +150,10 @@ typedef void(__cdecl* tss_dtor_t)(void*);
 
 typedef DWORD tss_t;
 
-int __cdecl tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor);
-void* __cdecl tss_get(tss_t tss_key);
-int __cdecl tss_set(tss_t tss_id, _In_opt_ void* val);
-void __cdecl tss_delete(tss_t tss_id);
+THREADS_API int __cdecl tss_create(_Out_ tss_t* tss_key, _In_opt_ tss_dtor_t destructor);
+THREADS_API void* __cdecl tss_get(tss_t tss_key);
+THREADS_API int __cdecl tss_set(tss_t tss_id, _In_opt_ void* val);
+THREADS_API void __cdecl tss_delete(tss_t tss_id);
 
 END_EXTERN_C
 

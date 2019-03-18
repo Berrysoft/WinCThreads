@@ -132,6 +132,8 @@ int __cdecl thrd_create(_Out_ thrd_t* thr, _In_ thrd_start_t func, _In_opt_ void
 
 int __cdecl thrd_equal(_In_ thrd_t lhs, _In_ thrd_t rhs)
 {
+    // The thread handle maybe a pseudo handle,
+    // thus we should compare their ids.
     return GetThreadId(lhs) == GetThreadId(rhs);
 }
 
@@ -149,6 +151,7 @@ static void _Timespec_setvalid(struct timespec* t)
     }
 }
 
+// Gets the duration of the time_point and now.
 static struct timespec _Timespec_duration(const struct timespec* time_point)
 {
     struct timespec current;
