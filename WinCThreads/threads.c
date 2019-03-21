@@ -541,6 +541,30 @@ int __cdecl smph_multipost(_In_ smph_t* sem, int count)
         return thrd_error;
 }
 
+typedef struct _SEMAPHORE_BASIC_INFORMATION
+{
+    ULONG CurrentCount;
+    ULONG MaximumCount;
+
+} SEMAPHORE_BASIC_INFORMATION, *PSEMAPHORE_BASIC_INFORMATION;
+
+typedef enum _SEMAPHORE_INFORMATION_CLASS
+{
+    SemaphoreBasicInformation
+} SEMAPHORE_INFORMATION_CLASS;
+
+NTSYSAPI NTSTATUS NTAPI NtQuerySemaphore(IN HANDLE SemaphoreHandle, IN SEMAPHORE_INFORMATION_CLASS SemaphoreInformationClass, OUT PVOID SemaphoreInformation, IN ULONG SemaphoreInformationLength, OUT PULONG ReturnLength OPTIONAL);
+
+int __cdecl smph_get(_In_ smph_t* __restrict sem, int* __restrict count)
+{
+    SEMAPHORE_BASIC_INFORMATION info;
+    ULONG len;
+    NTSTATUS r = NtQuerySemaphore(*sem, SemaphoreBasicInformation, &info, sizeof(SEMAPHORE_BASIC_INFORMATION), &len);
+    if (r != ERROR_SUCCESS) return thrd_error;
+    if (count) *count = info.CurrentCount;
+    return thrd_success;
+}
+
 void __cdecl smph_destroy(_In_ smph_t* sem)
 {
     BOOL r = CloseHandle(*sem);

@@ -85,6 +85,10 @@ enum
     mtx_recursive = 0x4
 };
 
+#ifdef _MSC_VER
+#pragma warning(push) // Avoid bug warning
+#pragma warning(disable : 4214) // Bit field types other than int
+#endif // _MSC_VER
 typedef struct
 {
     union {
@@ -92,10 +96,13 @@ typedef struct
         HANDLE mutex;
         SRWLOCK shared;
     } obj;
-    int basetype;
-    bool locked;
-    bool recursive;
+    unsigned int basetype : 2;
+    bool recursive : 1;
+    bool locked : 1;
 } mtx_t;
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif // _MSC_VER
 
 THREADS_API int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type);
 THREADS_API int __cdecl mtx_lock(_In_ mtx_t* mutex);
@@ -144,6 +151,7 @@ THREADS_API int __cdecl smph_timedwait(_In_ smph_t* __restrict sem, _In_ const s
 THREADS_API int __cdecl smph_trywait(_In_ smph_t* sem);
 THREADS_API int __cdecl smph_post(_In_ smph_t* sem);
 THREADS_API int __cdecl smph_multipost(_In_ smph_t* sem, int count);
+THREADS_API int __cdecl smph_get(_In_ smph_t* __restrict sem, int* __restrict count);
 THREADS_API void __cdecl smph_destroy(_In_ smph_t* sem);
 
 #ifdef _MSC_VER

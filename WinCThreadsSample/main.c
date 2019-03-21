@@ -109,7 +109,7 @@ int thread_func(void* arg)
 int main()
 {
     globalInt = 0;
-    check_return(smph_init(&sem, 1, 0));
+    check_return(smph_init(&sem, THREADS_COUNT, 0));
     check_return(cnd_init(&cond));
     check_return(mtx_init(&cond_mutex, mtx_shared | mtx_recursive));
 
@@ -120,6 +120,10 @@ int main()
         check_return(thrd_create(&threads[i], thread_func, (void*)(long long)i));
     }
     printf("Hello from main!\n");
+
+    int semc;
+    check_return(smph_get(&sem, &semc));
+    printf("The semaphore count: %d\n", semc);
 
     check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
     check_return(smph_post(&sem));
