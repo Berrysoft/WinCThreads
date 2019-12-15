@@ -239,7 +239,7 @@ int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type)
     case mtx_plain:
         InitializeCriticalSection(&mutex->obj.cs);
         break;
-    case mtx_shared:
+    case _Mtx_shared:
         InitializeSRWLock(&mutex->obj.shared);
         break;
     case mtx_timed:
@@ -268,7 +268,7 @@ int __cdecl mtx_lock(_In_ mtx_t* mutex)
     case mtx_plain:
         EnterCriticalSection(&mutex->obj.cs);
         break;
-    case mtx_shared:
+    case _Mtx_shared:
         AcquireSRWLockExclusive(&mutex->obj.shared);
         break;
     case mtx_timed:
@@ -279,9 +279,9 @@ int __cdecl mtx_lock(_In_ mtx_t* mutex)
     return _Mtx_non_recursive_lock(mutex);
 }
 
-int __cdecl mtx_slock(_In_ mtx_t* mutex)
+int __cdecl _Mtx_slock(_In_ mtx_t* mutex)
 {
-    if (mutex->basetype != mtx_shared) return thrd_error;
+    if (mutex->basetype != _Mtx_shared) return thrd_error;
     AcquireSRWLockShared(&mutex->obj.shared);
     return thrd_success;
 }
@@ -313,7 +313,7 @@ int __cdecl mtx_trylock(_In_ mtx_t* mutex)
     case mtx_plain:
         if (!TryEnterCriticalSection(&mutex->obj.cs)) r = thrd_busy;
         break;
-    case mtx_shared:
+    case _Mtx_shared:
         if (!TryAcquireSRWLockExclusive(&mutex->obj.shared)) r = thrd_busy;
         break;
     case mtx_timed:
@@ -324,9 +324,9 @@ int __cdecl mtx_trylock(_In_ mtx_t* mutex)
     return r;
 }
 
-int __cdecl mtx_tryslock(_In_ mtx_t* mutex)
+int __cdecl _Mtx_tryslock(_In_ mtx_t* mutex)
 {
-    if (mutex->basetype != mtx_shared) return thrd_error;
+    if (mutex->basetype != _Mtx_shared) return thrd_error;
     if (TryAcquireSRWLockShared(&mutex->obj.shared))
         return thrd_success;
     else
@@ -341,7 +341,7 @@ int __cdecl mtx_unlock(_In_ mtx_t* mutex)
     case mtx_plain:
         LeaveCriticalSection(&mutex->obj.cs);
         break;
-    case mtx_shared:
+    case _Mtx_shared:
         ReleaseSRWLockExclusive(&mutex->obj.shared);
         break;
     case mtx_timed:
@@ -352,9 +352,9 @@ int __cdecl mtx_unlock(_In_ mtx_t* mutex)
     return thrd_success;
 }
 
-int __cdecl mtx_sunlock(_In_ mtx_t* mutex)
+int __cdecl _Mtx_sunlock(_In_ mtx_t* mutex)
 {
-    if (mutex->basetype != mtx_shared) return thrd_error;
+    if (mutex->basetype != _Mtx_shared) return thrd_error;
     ReleaseSRWLockShared(&mutex->obj.shared);
     return thrd_success;
 }
@@ -411,7 +411,7 @@ int __cdecl cnd_broadcast(_In_ cnd_t* cond)
     return thrd_success;
 }
 
-static int _Cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
+static int _Cnd_wait_impl(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
 {
     bool usemutex = mutex->basetype == mtx_timed || !mutex->recursive;
     if (usemutex)
@@ -420,7 +420,7 @@ static int _Cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, 
         EnterCriticalSection(&cond->cs);
     }
     bool succeed;
-    if (mutex->basetype != mtx_shared || usemutex)
+    if (mutex->basetype != _Mtx_shared || usemutex)
     {
         succeed = SleepConditionVariableCS(&cond->cv, usemutex ? &cond->cs : &mutex->obj.cs, ms);
     }
@@ -449,18 +449,18 @@ static int _Cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, 
 
 int __cdecl cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex)
 {
-    return _Cnd_wait(cond, mutex, INFINITE);
+    return _Cnd_wait_impl(cond, mutex, INFINITE);
 }
 
 int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point)
 {
     struct timespec span = _Timespec_duration(time_point);
-    return _Cnd_wait(cond, mutex, _Timespec_ms(&span));
+    return _Cnd_wait_impl(cond, mutex, _Timespec_ms(&span));
 }
 
-static int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
+static int __cdecl _Cnd_swait_impl(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, DWORD ms)
 {
-    if (mutex->basetype != mtx_shared) return thrd_error;
+    if (mutex->basetype != _Mtx_shared) return thrd_error;
     if (SleepConditionVariableSRW(&cond->cv, &mutex->obj.shared, ms, CONDITION_VARIABLE_LOCKMODE_SHARED))
         return thrd_success;
     else
@@ -473,15 +473,15 @@ static int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restric
     }
 }
 
-int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex)
+int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex)
 {
-    return _Cnd_swait(cond, mutex, INFINITE);
+    return _Cnd_swait_impl(cond, mutex, INFINITE);
 }
 
-int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point)
+int __cdecl _Cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point)
 {
     struct timespec span = _Timespec_duration(time_point);
-    return _Cnd_swait(cond, mutex, _Timespec_ms(&span));
+    return _Cnd_swait_impl(cond, mutex, _Timespec_ms(&span));
 }
 
 void __cdecl cnd_destroy(_In_ cnd_t* cond)
@@ -489,7 +489,7 @@ void __cdecl cnd_destroy(_In_ cnd_t* cond)
     DeleteCriticalSection(&cond->cs);
 }
 
-int __cdecl smph_init(_Out_ smph_t* sem, int max_count, int count)
+int __cdecl _Smph_init(_Out_ _Smph_t* sem, int max_count, int count)
 {
     *sem = CreateSemaphore(NULL, count, max_count, NULL);
     if (*sem)
@@ -498,7 +498,7 @@ int __cdecl smph_init(_Out_ smph_t* sem, int max_count, int count)
         return thrd_error;
 }
 
-static int _Smph_wait(_In_ smph_t* sem, DWORD ms)
+static int _Smph_wait_impl(_In_ _Smph_t* sem, DWORD ms)
 {
     DWORD r = WaitForSingleObject(*sem, ms);
     if (!r)
@@ -512,28 +512,28 @@ static int _Smph_wait(_In_ smph_t* sem, DWORD ms)
     }
 }
 
-int __cdecl smph_wait(_In_ smph_t* sem)
+int __cdecl _Smph_wait(_In_ _Smph_t* sem)
 {
-    return _Smph_wait(sem, INFINITE);
+    return _Smph_wait_impl(sem, INFINITE);
 }
 
-int __cdecl smph_timedwait(_In_ smph_t* __restrict sem, _In_ const struct timespec* __restrict time_point)
+int __cdecl _Smph_timedwait(_In_ _Smph_t* __restrict sem, _In_ const struct timespec* __restrict time_point)
 {
     struct timespec span = _Timespec_duration(time_point);
-    return _Smph_wait(sem, _Timespec_ms(&span));
+    return _Smph_wait_impl(sem, _Timespec_ms(&span));
 }
 
-int __cdecl smph_trywait(_In_ smph_t* sem)
+int __cdecl _Smph_trywait(_In_ _Smph_t* sem)
 {
-    return _Smph_wait(sem, 0);
+    return _Smph_wait_impl(sem, 0);
 }
 
-int __cdecl smph_post(_In_ smph_t* sem)
+int __cdecl _Smph_post(_In_ _Smph_t* sem)
 {
-    return smph_multipost(sem, 1);
+    return _Smph_multipost(sem, 1);
 }
 
-int __cdecl smph_multipost(_In_ smph_t* sem, int count)
+int __cdecl _Smph_multipost(_In_ _Smph_t* sem, int count)
 {
     if (ReleaseSemaphore(*sem, count, NULL))
         return thrd_success;
@@ -555,7 +555,7 @@ typedef enum _SEMAPHORE_INFORMATION_CLASS
 
 NTSYSAPI NTSTATUS NTAPI NtQuerySemaphore(IN HANDLE SemaphoreHandle, IN SEMAPHORE_INFORMATION_CLASS SemaphoreInformationClass, OUT PVOID SemaphoreInformation, IN ULONG SemaphoreInformationLength, OUT PULONG ReturnLength OPTIONAL);
 
-int __cdecl smph_get(_In_ smph_t* __restrict sem, int* __restrict count)
+int __cdecl _Smph_get(_In_ _Smph_t* __restrict sem, int* __restrict count)
 {
     SEMAPHORE_BASIC_INFORMATION info;
     ULONG len;
@@ -565,7 +565,7 @@ int __cdecl smph_get(_In_ smph_t* __restrict sem, int* __restrict count)
     return thrd_success;
 }
 
-void __cdecl smph_destroy(_In_ smph_t* sem)
+void __cdecl _Smph_destroy(_In_ _Smph_t* sem)
 {
     BOOL r = CloseHandle(*sem);
     assert(r);

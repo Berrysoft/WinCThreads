@@ -41,7 +41,7 @@ once_flag flag = ONCE_FLAG_INIT;
 void print_string(void) { printf("Hello once!\n"); }
 
 int globalInt;
-smph_t sem;
+_Smph_t sem;
 
 cnd_t cond;
 mtx_t cond_mutex;
@@ -68,13 +68,13 @@ int thread_func(void* arg)
     {
         // If not locked, you may get 5 in the end.
         // But actually we want 5 * THREADS_COUNT == 20 here.
-        check_return(smph_wait(&sem));
+        check_return(_Smph_wait(&sem));
 
         int t = globalInt;
         check_return(thrd_sleep(&(struct timespec){ .tv_nsec = 10000000 }, NULL));
         globalInt = ++t;
 
-        check_return(smph_post(&sem));
+        check_return(_Smph_post(&sem));
     }
     printf("globalInt == %d\n", globalInt);
 
@@ -97,9 +97,9 @@ int thread_func(void* arg)
     call_once(&flag, print_string);
 
     // A RIGHT sample for condition variables
-    check_return(mtx_slock(&cond_mutex));
-    check_return(cnd_swait(&cond, &cond_mutex));
-    check_return(mtx_sunlock(&cond_mutex));
+    check_return(_Mtx_slock(&cond_mutex));
+    check_return(_Cnd_swait(&cond, &cond_mutex));
+    check_return(_Mtx_sunlock(&cond_mutex));
     printf("Thread %d is going to exit.\n", thrd_id);
 
     // Return a specified code.
@@ -109,9 +109,9 @@ int thread_func(void* arg)
 int main()
 {
     globalInt = 0;
-    check_return(smph_init(&sem, THREADS_COUNT, 0));
+    check_return(_Smph_init(&sem, THREADS_COUNT, 0));
     check_return(cnd_init(&cond));
-    check_return(mtx_init(&cond_mutex, mtx_shared | mtx_recursive));
+    check_return(mtx_init(&cond_mutex, _Mtx_shared | mtx_recursive));
 
     thrd_t threads[THREADS_COUNT] = { 0 };
     for (int i = 0; i < THREADS_COUNT; i++)
@@ -122,11 +122,11 @@ int main()
     printf("Hello from main!\n");
 
     int semc;
-    check_return(smph_get(&sem, &semc));
+    check_return(_Smph_get(&sem, &semc));
     printf("The semaphore count: %d\n", semc);
 
     check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
-    check_return(smph_post(&sem));
+    check_return(_Smph_post(&sem));
 
     // Sleep and signal the threads
     check_return(thrd_sleep(&(struct timespec){ .tv_sec = 1 }, NULL));
@@ -147,6 +147,6 @@ int main()
 
     mtx_destroy(&cond_mutex);
     cnd_destroy(&cond);
-    smph_destroy(&sem);
+    _Smph_destroy(&sem);
     return 0;
 }

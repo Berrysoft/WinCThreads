@@ -80,7 +80,7 @@ THREADS_API int __cdecl thrd_join(_In_ thrd_t thr, int* res);
 enum
 {
     mtx_plain = 0x1,
-    mtx_shared = 0x2, // Non-standard extension
+    _Mtx_shared = 0x2,
     mtx_timed = 0x3,
     mtx_recursive = 0x4
 };
@@ -106,22 +106,19 @@ typedef struct
 
 THREADS_API int __cdecl mtx_init(_Out_ mtx_t* mutex, _In_ int type);
 THREADS_API int __cdecl mtx_lock(_In_ mtx_t* mutex);
-THREADS_API int __cdecl mtx_slock(_In_ mtx_t* mutex); // Non-standard extension
+THREADS_API int __cdecl _Mtx_slock(_In_ mtx_t* mutex);
 THREADS_API int __cdecl mtx_timedlock(_In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
 THREADS_API int __cdecl mtx_trylock(_In_ mtx_t* mutex);
-THREADS_API int __cdecl mtx_tryslock(_In_ mtx_t* mutex); // Non-standard extension
+THREADS_API int __cdecl _Mtx_tryslock(_In_ mtx_t* mutex);
 THREADS_API int __cdecl mtx_unlock(_In_ mtx_t* mutex);
-THREADS_API int __cdecl mtx_sunlock(_In_ mtx_t* mutex); // Non-standard extension
+THREADS_API int __cdecl _Mtx_sunlock(_In_ mtx_t* mutex);
 THREADS_API void __cdecl mtx_destroy(_In_ mtx_t* mutex);
 
 // Call-once
 
 typedef INIT_ONCE once_flag;
 
-#define ONCE_FLAG_INIT \
-    {                  \
-        NULL           \
-    }
+#define ONCE_FLAG_INIT INIT_ONCE_STATIC_INIT
 
 THREADS_API void __cdecl call_once(_In_ once_flag* flag, _In_ void(__cdecl* func)(void));
 
@@ -138,21 +135,21 @@ THREADS_API int __cdecl cnd_signal(_In_ cnd_t* cond);
 THREADS_API int __cdecl cnd_broadcast(_In_ cnd_t* cond);
 THREADS_API int __cdecl cnd_wait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex);
 THREADS_API int __cdecl cnd_timedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
-THREADS_API int __cdecl cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex); // Non-standard extension
-THREADS_API int __cdecl cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point); // Non-standard extension
+THREADS_API int __cdecl _Cnd_swait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex);
+THREADS_API int __cdecl _Cnd_stimedwait(_In_ cnd_t* __restrict cond, _In_ mtx_t* __restrict mutex, _In_ const struct timespec* __restrict time_point);
 THREADS_API void __cdecl cnd_destroy(_In_ cnd_t* cond);
 
-// Semaphore - non standard extension
+// Semaphore
 
-typedef HANDLE smph_t;
-THREADS_API int __cdecl smph_init(_Out_ smph_t* sem, int max_count, int count);
-THREADS_API int __cdecl smph_wait(_In_ smph_t* sem);
-THREADS_API int __cdecl smph_timedwait(_In_ smph_t* __restrict sem, _In_ const struct timespec* __restrict time_point);
-THREADS_API int __cdecl smph_trywait(_In_ smph_t* sem);
-THREADS_API int __cdecl smph_post(_In_ smph_t* sem);
-THREADS_API int __cdecl smph_multipost(_In_ smph_t* sem, int count);
-THREADS_API int __cdecl smph_get(_In_ smph_t* __restrict sem, int* __restrict count);
-THREADS_API void __cdecl smph_destroy(_In_ smph_t* sem);
+typedef HANDLE _Smph_t;
+THREADS_API int __cdecl _Smph_init(_Out_ _Smph_t* sem, int max_count, int count);
+THREADS_API int __cdecl _Smph_wait(_In_ _Smph_t* sem);
+THREADS_API int __cdecl _Smph_timedwait(_In_ _Smph_t* __restrict sem, _In_ const struct timespec* __restrict time_point);
+THREADS_API int __cdecl _Smph_trywait(_In_ _Smph_t* sem);
+THREADS_API int __cdecl _Smph_post(_In_ _Smph_t* sem);
+THREADS_API int __cdecl _Smph_multipost(_In_ _Smph_t* sem, int count);
+THREADS_API int __cdecl _Smph_get(_In_ _Smph_t* __restrict sem, int* __restrict count);
+THREADS_API void __cdecl _Smph_destroy(_In_ _Smph_t* sem);
 
 #ifdef _MSC_VER
 // This keyword hasn't been implemented by MSVC
