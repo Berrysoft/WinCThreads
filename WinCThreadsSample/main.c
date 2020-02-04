@@ -2,7 +2,7 @@
  * 
  * MIT License
  * 
- * Copyright (c) 2019 Berrysoft
+ * Copyright (c) 2019-2020 Berrysoft
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -60,7 +60,7 @@ void free_print_2(void* p)
 
 int thread_func(void* arg)
 {
-    int thrd_id = (int)(long long)arg;
+    int thrd_id = (int)(intptr_t)arg;
     printf("Hello from thread %d!\n", thrd_id);
 
     int m = 5;
@@ -117,7 +117,7 @@ int main()
     for (int i = 0; i < THREADS_COUNT; i++)
     {
         // Pass the threads their own id
-        check_return(thrd_create(&threads[i], thread_func, (void*)(long long)i));
+        check_return(thrd_create(&threads[i], thread_func, (void*)(intptr_t)i));
     }
     printf("Hello from main!\n");
 

@@ -22,7 +22,6 @@
     <ClInclude Include="threads.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="dllmain.c" />
     <ClCompile Include="threads.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

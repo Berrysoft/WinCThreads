@@ -23,8 +23,5 @@
     <ClCompile Include="threads.c">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="dllmain.c">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>
